@@ -152,17 +152,23 @@ func RubyFieldValue(field pgs.Field) string {
 
 func rubyProtoTypeElem(field pgs.Field, ft FieldType, mt methodType) string {
 	pt := ft.ProtoType()
+	result := ""
+	nilable := !strings.Contains(field.Descriptor().GetOptions().String(), "1000:1")
+
 	if pt.IsInt() {
-		return "Integer"
+		result = "Integer"
 	}
 	if pt.IsNumeric() {
-		return "Float"
+		result = "Float"
 	}
 	if pt == pgs.StringT || pt == pgs.BytesT {
-		return "String"
+		result = "String"
 	}
 	if pt == pgs.BoolT {
-		return "T::Boolean"
+		result = "T::Boolean"
+	}
+	if pt == pgs.MessageT {
+		result = RubyMessageType(ft.Embed())
 	}
 	if pt == pgs.EnumT {
 		if mt == methodTypeGetter {
@@ -170,11 +176,17 @@ func rubyProtoTypeElem(field pgs.Field, ft FieldType, mt methodType) string {
 		}
 		return "T.any(Symbol, String, Integer)"
 	}
-	if pt == pgs.MessageT {
-		return fmt.Sprintf("T.nilable(%s)", RubyMessageType(ft.Embed()))
+
+	if result == "" {
+		log.Panicf("Unsupported field type for field: %v\n", field.Name().String())
+		return ""
 	}
-	log.Panicf("Unsupported field type for field: %v\n", field.Name().String())
-	return ""
+
+	if nilable {
+		return fmt.Sprintf("T.nilable(%s)", result)
+	}
+
+	return result
 }
 
 func rubyProtoTypeValue(field pgs.Field, ft FieldType) string {
